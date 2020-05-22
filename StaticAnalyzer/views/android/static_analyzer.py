@@ -18,6 +18,7 @@ from django.template.defaulttags import register
 
 from MobSF.utils import (
     file_size,
+    is_dir_exists,
     is_file_exists,
     print_n_send_error_response,
 )
@@ -43,12 +44,6 @@ from StaticAnalyzer.views.shared_func import (firebase_analysis,
                                               update_scan_timestamp)
 
 from androguard.core.bytecodes import apk
-
-try:
-    import io
-    StringIO = io.StringIO  # noqa F401
-except ImportError:
-    from io import StringIO  # noqa F401
 
 
 logger = logging.getLogger(__name__)
@@ -89,8 +84,9 @@ def static_analyzer(request, api=False):
             app_dic['dir'] = settings.BASE_DIR  # BASE DIR
             app_dic['app_name'] = filename  # APP ORGINAL NAME
             app_dic['md5'] = checksum  # MD5
+            # APP DIRECTORY
             app_dic['app_dir'] = os.path.join(settings.UPLD_DIR, app_dic[
-                                              'md5'] + '/')  # APP DIRECTORY
+                                              'md5'] + '/')
             app_dic['tools_dir'] = os.path.join(
                 app_dic['dir'], 'StaticAnalyzer/tools/')  # TOOLS DIR
             logger.info('Starting Analysis on : %s', app_dic['app_name'])
@@ -394,8 +390,7 @@ def static_analyzer(request, api=False):
                         code_an_dic = code_analysis(
                             app_dic['app_dir'],
                             man_an_dic['permissons'],
-                            pro_type,
-                        )
+                            pro_type)
                         # Firebase DB Check
                         code_an_dic['firebase'] = firebase_analysis(
                             list(set(code_an_dic['urls_list'])))
@@ -509,6 +504,13 @@ def valid_android_zip(app_dir):
         xcode = [f for f in os.listdir(app_dir) if f.endswith('.xcodeproj')]
         if xcode:
             return 'ios', True
+        # Relaxed iOS Source Check
+        for x in os.listdir(app_dir):
+            obj = os.path.join(app_dir, x)
+            if not is_dir_exists(obj):
+                continue
+            if [f for f in os.listdir(obj) if f.endswith('.xcodeproj')]:
+                return 'ios', True
         return '', False
     except Exception:
         logger.exception('Determining Upload type')
